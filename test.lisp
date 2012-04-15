@@ -1,6 +1,8 @@
 (asdf:load-system :enhanced-thread-pool)
 (in-package :enhanced-thread-pool)
-(defvar *pool* (make-instance 'thread-pool :name "test" :min-size 2))
+;(defvar *pool* (make-instance 'thread-pool :name "test" :min-size 2))
+;(defvar *pool* (make-instance 'thread-pool :name "test" :min-size 2 :max-size nil))
+(defvar *pool* (make-instance 'thread-pool :name "test" :min-size 2 :max-size 3))
 (start-pool *pool*)
 (execute *pool*
          #'(lambda ()

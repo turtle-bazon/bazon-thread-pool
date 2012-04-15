@@ -14,6 +14,9 @@
     :type boolean
     :initform t)))
 
+(defgeneric wake-up (pool-worker)
+  (:documentation ""))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defclass thread-pool ()
@@ -24,7 +27,7 @@
     :initarg :min-size
     :initform 1)
    (max-size
-    :type integer
+    :type (or integer null)
     :initarg :max-size
     :initform 1)
    (keep-alive-time
@@ -60,7 +63,14 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(defun make-pool-worker (&key thread-pool)
+(defmethod wake-up ((pool-worker pool-worker))
+  (with-slots (condition)
+      pool-worker
+    (condition-notify condition)))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defun make-pool-worker (thread-pool)
   (let ((pool-worker (make-instance 'pool-worker)))
     (with-slots (thread lock condition running-p)
 	pool-worker
@@ -84,7 +94,7 @@
 (defmethod add-pool-worker ((thread-pool thread-pool))
   (with-slots (name idle-workers-queue workers-queue)
       thread-pool
-    (let ((pool-worker (make-pool-worker :thread-pool thread-pool)))
+    (let ((pool-worker (make-pool-worker thread-pool)))
       (enqueue pool-worker idle-workers-queue)
       (enqueue pool-worker workers-queue)
       pool-worker)))
@@ -112,15 +122,15 @@
 	  (while pool-worker))))
 
 (defmethod execute ((thread-pool thread-pool) &rest functions)
-  (with-slots (jobs-queue idle-workers-queue max-size)
+  (with-slots (jobs-queue idle-workers-queue workers-queue max-size)
       thread-pool
     (iter (for function in functions)
 	  (enqueue function jobs-queue)
 	  (let ((pool-worker (dequeue idle-workers-queue)))
 	    (if pool-worker
-		(with-slots (condition)
-		    pool-worker
-		  (condition-notify condition))
-		#+nil(when (and max-size
-				(< workers-count max-size))
-		       ))))))
+		(wake-up pool-worker)
+		(when (or (not max-size)
+			  (< (size workers-queue) max-size))
+		  (let ((new-pool-worker (make-pool-worker thread-pool)))
+		    (enqueue new-pool-worker workers-queue)
+		    (wake-up new-pool-worker))))))))
