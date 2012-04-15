@@ -33,7 +33,6 @@
    (keep-alive-time
     :type integer
     :initarg :keep-alive-time)
-   (thread)
    (main-lock
     :initform (make-lock "thread-pool main lock"))
    (jobs-queue
