@@ -3,6 +3,7 @@
 ;(defvar *pool* (make-instance 'thread-pool :name "test" :min-size 2))
 ;(defvar *pool* (make-instance 'thread-pool :name "test" :min-size 2 :max-size nil))
 (defvar *pool* (make-instance 'thread-pool :name "test" :min-size 2 :max-size 3))
+;(defvar *pool* (make-instance 'thread-pool :name "test" :min-size 2 :max-size 200))
 (start-pool *pool*)
 (execute *pool*
          #'(lambda ()
