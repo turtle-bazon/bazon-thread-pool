@@ -72,6 +72,9 @@
 (defgeneric make-blocking-hash-set ()
   (:documentation ""))
 
+(defgeneric clear (blocking-hash-set)
+  (:documentation ""))
+
 (defgeneric add-object (object blocking-hash-set)
   (:documentation ""))
 
@@ -88,6 +91,11 @@
 
 (defmethod make-blocking-hash-set ()
   (make-instance 'blocking-hash-set))
+
+(defmethod clear ((blocking-hash-set blocking-hash-set))
+  (with-slots (hash-table lock)
+      blocking-hash-set
+    (clrhash hash-table)))
 
 (defmethod add-object (object (blocking-hash-set blocking-hash-set))
   (with-slots (hash-table lock)
