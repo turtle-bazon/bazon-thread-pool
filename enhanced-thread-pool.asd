@@ -12,4 +12,9 @@
 			((:file "package")
 			 (:file "utils" :depends-on ("package"))
 			 (:file "enhanced-thread-pool" :depends-on ("package"
-								    "utils"))))))
+								    "utils")))))
+  :in-order-to ((test-op (test-op enhanced-thread-pool-tests)))
+  :perform (test-op :after (op c)
+		    (funcall
+		     (intern (symbol-name '#:run-all-tests)
+			     :enhanced-thread-pool-tests))))

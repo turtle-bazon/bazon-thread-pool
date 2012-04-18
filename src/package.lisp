@@ -6,10 +6,8 @@
 	:iterate
 	:bordeaux-threads)
   (:export
-   :make-thread-pool
    :start-pool
    :stop-pool
-   :add-to-pool
-   :pool-size
-   :pool-name)
+   :execute
+   :thread-pool)
   (:documentation "An enhanced thread pool system"))

@@ -40,7 +40,7 @@
     :initarg :max-size
     :initform 1)
    (keep-alive-time
-    :type integer
+    :type (integer 1 *)
     :initform 60
     :initarg :keep-alive-time)
    (main-lock
@@ -115,6 +115,12 @@
 		    (setf last-used-time (get-universal-time))
 		    (pool-worker-finished thread-pool pool-worker)))))))
     pool-worker))
+
+(defmethod make-instance :after ((thread-pool thread-pool) &key initargs)
+  (with-slots (min-size max-size)
+      thread-pool
+    (when (and max-size (< max-size min-size))
+      (setf max-size min-size))))
 
 (defmethod create-pool-worker ((thread-pool thread-pool))
   (with-slots (idle-workers-queue workers-set)
