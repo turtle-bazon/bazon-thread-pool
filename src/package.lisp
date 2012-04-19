@@ -9,5 +9,8 @@
    :start-pool
    :stop-pool
    :execute
-   :thread-pool)
+   :thread-pool
+
+   :make-fixed-thread-pool
+   :make-cached-thread-pool)
   (:documentation "An enhanced thread pool system"))

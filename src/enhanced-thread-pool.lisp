@@ -30,7 +30,8 @@
 
 (defclass thread-pool ()
   ((name
-    :initarg :name)
+    :initarg :name
+    :initform (error "Name must be provided"))
    (min-size
     :type integer
     :initarg :min-size
@@ -116,11 +117,17 @@
 		    (pool-worker-finished thread-pool pool-worker)))))))
     pool-worker))
 
-(defmethod make-instance :after ((thread-pool thread-pool) &key initargs)
+(defmethod initialize-instance :after ((thread-pool thread-pool) &key)
   (with-slots (min-size max-size)
       thread-pool
     (when (and max-size (< max-size min-size))
       (setf max-size min-size))))
+
+(defun make-fixed-thread-pool (name &optional &key (size 1))
+  (make-instance 'thread-pool :name name :min-size size))
+
+(defun make-cached-thread-pool (name &optional &key (size 1) (max-size 2) (keep-alive-time 60))
+  (make-instance 'thread-pool :name name :min-size size :max-size max-size :keep-alive-time keep-alive-time))
 
 (defmethod create-pool-worker ((thread-pool thread-pool))
   (with-slots (idle-workers-queue workers-set)
@@ -163,7 +170,8 @@
 	      (wake-up pool-worker))))))
 
 (defmethod pool-worker-finished ((thread-pool thread-pool) (pool-worker pool-worker))
-  (with-slots (min-size keep-alive-time idle-workers-queue workers-set
+  (with-slots (min-size keep-alive-time main-lock
+			idle-workers-queue workers-set
 			(thread-pool-running-p running-p))
       thread-pool
     (with-slots (running-p)
@@ -172,13 +180,15 @@
 	  (progn
 	    (enqueue pool-worker idle-workers-queue)
 	    (let ((current-time (get-universal-time)))
-	      (when (> (size workers-set) min-size)
+	      (with-lock-held (main-lock)
 		(iter (for pool-worker-candidate = (peek-queue idle-workers-queue))
-		      (while (and pool-worker-candidate
-				  (> current-time (+ (slot-value pool-worker-candidate 'last-used-time) keep-alive-time))))
+		      (while (> (size workers-set) min-size))
+		      (when (and pool-worker-candidate
+				 (> current-time (+ (slot-value pool-worker-candidate 'last-used-time) keep-alive-time))))
 		      (let ((pool-worker-actual (dequeue idle-workers-queue)))
-			(stop pool-worker-actual)
-			(remove-object pool-worker-actual workers-set))))))
+			(when pool-worker-actual
+			  (stop pool-worker-actual)
+			  (remove-object pool-worker-actual workers-set)))))))
 	  (progn
 	    (stop pool-worker)
 	    (remove-object pool-worker workers-set))))))
