@@ -84,6 +84,9 @@
 (defgeneric size (blocking-hash-set)
   (:documentation ""))
 
+(defgeneric keys (blocking-hash-set)
+  (:documentation ""))
+
 (defgeneric each (blocking-hash-set function)
   (:documentation ""))
 
@@ -111,6 +114,12 @@
   (with-slots (hash-table)
       blocking-hash-set
     (hash-table-count hash-table)))
+
+(defmethod keys ((blocking-hash-set blocking-hash-set))
+  (with-slots (hash-table)
+      blocking-hash-set
+    (iter (for (key _) in-hashtable hash-table)
+	  (collect key))))
 
 (defmethod each ((blocking-hash-set blocking-hash-set) function)
   (with-slots (hash-table lock)

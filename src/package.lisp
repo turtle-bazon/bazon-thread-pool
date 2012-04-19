@@ -8,6 +8,7 @@
   (:export
    :start-pool
    :stop-pool
+   :join-pool
    :execute
    :thread-pool
 

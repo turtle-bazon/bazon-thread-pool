@@ -26,6 +26,9 @@
 (defgeneric stop (pool-worker)
   (:documentation ""))
 
+(defgeneric join-worker-thread (pool-worker)
+  (:documentation ""))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defclass thread-pool ()
@@ -68,6 +71,9 @@
 (defgeneric stop-pool (thread-pool)
   (:documentation ""))
 
+(defgeneric join-pool (thread-pool)
+  (:documentation ""))
+
 (defgeneric execute (thread-pool &rest functions)
   (:documentation ""))
 
@@ -91,6 +97,11 @@
       pool-worker
     (setf running-p nil)
     (condition-notify condition)))
+
+(defmethod join-worker-thread ((pool-worker pool-worker))
+  (with-slots (thread)
+      pool-worker
+    (join-thread thread)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -155,6 +166,13 @@
 	      (stop pool-worker)))
     (iter (for pool-worker = (dequeue idle-workers-queue))
 	  (while pool-worker))))
+
+(defmethod join-pool ((thread-pool thread-pool))
+  (with-slots (workers-set)
+      thread-pool
+    (iter (while (> (size workers-set) 0))
+	  (iter (for pool-worker in (keys workers-set))
+		(join-worker-thread pool-worker)))))
 
 (defmethod execute ((thread-pool thread-pool) &rest functions)
   (with-slots (jobs-queue idle-workers-queue workers-set max-size)
