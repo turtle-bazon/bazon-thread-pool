@@ -6,18 +6,24 @@
 
 (defclass pool-worker ()
   ((execute-function
-    :initform nil)
+    :initform nil
+    :documentation "Function to be executed in thread")
    (lock
-    :initform (make-lock "pool-worker lock"))
+    :initform (make-lock "pool-worker lock")
+    :documentation "Worker lock (used in condition-wait)")
    (condition
-    :initform (make-condition-variable :name "pool-worker condition"))
-   (thread)
+    :initform (make-condition-variable :name "pool-worker condition")
+    :documentation "Condition variable (used in condition-wait)")
+   (thread
+    :documentation "Thread, that holds parallel process to execute code")
    (last-used-time
     :type integer
-    :initform (get-universal-time))
+    :initform (get-universal-time)
+    :documentation "Worker's last used time (to determine inactive workers)")
    (running-p
     :type boolean
-    :initform t)))
+    :initform t
+    :documentation "Boolean determines is worker runing or should be stopped")))
 
 (defgeneric sleep-down (pool-worker)
   (:documentation ""))
