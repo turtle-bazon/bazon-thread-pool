@@ -26,65 +26,73 @@
     :documentation "Boolean determines is worker runing or should be stopped")))
 
 (defgeneric sleep-down (pool-worker)
-  (:documentation ""))
+  (:documentation "Set worker to sleep state until any code wake up it"))
 
 (defgeneric wake-up (pool-worker function)
-  (:documentation ""))
+  (:documentation "Wake up sleeping worker"))
 
 (defgeneric stop (pool-worker)
-  (:documentation ""))
+  (:documentation "Stop execution of worker"))
 
 (defgeneric join-worker-thread (pool-worker)
-  (:documentation ""))
+  (:documentation "Join to worker thread and await for it's termination"))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defclass thread-pool ()
   ((name
     :initarg :name
-    :initform (error "Name must be provided"))
+    :initform (error "Name must be provided")
+    :documentation "Thread pool's name")
    (min-size
     :type integer
     :initarg :min-size
-    :initform 1)
+    :initform 1
+    :documentation "Minimum number of spawned threads")
    (max-size
     :type (or integer null)
     :initarg :max-size
-    :initform 1)
+    :initform 1
+    :documentation "Maximum number of spawned threads")
    (keep-alive-time
     :type (integer 1 *)
     :initform 60
-    :initarg :keep-alive-time)
+    :initarg :keep-alive-time
+    :documentation "Additional threads alive time, in seconds")
    (jobs-queue
     :type blocking-queue
-    :initform (make-blocking-queue))
+    :initform (make-blocking-queue)
+    :documentation "Queue of jobs to execute")
    (idle-workers-queue
     :type blocking-queue
-    :initform (make-blocking-queue))
+    :initform (make-blocking-queue)
+    :documentation "Queue of idle workers")
    (workers-set
     :type blocking-hash-set
-    :initform (make-blocking-hash-set))
+    :initform (make-blocking-hash-set)
+    :documentation "All spawned workers set")
    (running-p
     :type boolean
-    :initform nil)))
+    :initform nil
+    :documentation "Boolean determines is pool running or should be stopped")))
 
 (defgeneric create-pool-worker (thread-pool)
-  (:documentation ""))
+  (:documentation "Create new pool worker when jobs will execute"))
 
 (defgeneric start-pool (thread-pool)
-  (:documentation ""))
+  (:documentation "Start pool, means spawn all necessary workers determined by min-size"))
 
 (defgeneric stop-pool (thread-pool)
-  (:documentation ""))
+  (:documentation "Stop pool and all spawned workers"))
 
 (defgeneric join-pool (thread-pool)
-  (:documentation ""))
+  (:documentation "Join to pool's workers and await it's termination"))
 
 (defgeneric execute (thread-pool &rest functions)
-  (:documentation ""))
+  (:documentation "Execute function in any idle worker"))
 
 (defgeneric pool-worker-finished (thread-pool pool-worker result)
-  (:documentation ""))
+  (:documentation "Callback on finish worker call"))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
