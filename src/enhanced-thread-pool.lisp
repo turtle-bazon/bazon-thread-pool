@@ -189,6 +189,14 @@
 	  (iter (for pool-worker in (keys workers-set))
 		(join-worker-thread pool-worker)))))
 
+(defun execute-single (thread-pool function)
+  (with-slots (jobs-queue idle-workers-queue)
+      thread-pool
+    (let ((pool-worker (dequeue idle-workers-queue)))
+      (if pool-worker
+	  (wake-up pool-worker function)
+	  (enqueue function jobs-queue)))))
+
 (defmethod execute ((thread-pool thread-pool) &rest functions)
   (with-slots (jobs-queue idle-workers-queue workers-set max-size)
       thread-pool
@@ -196,11 +204,12 @@
 	  (if (and (empty-queue-p idle-workers-queue)
 		   (or (not max-size)
 		       (< (size workers-set) max-size)))
+	      #+nil(progn
+		(format t "thread creation~%")
+		(execute-single thread-pool #'(lambda ()
+						(create-pool-worker thread-pool))))
 	      (create-pool-worker thread-pool))
-	  (let ((pool-worker (dequeue idle-workers-queue)))
-	    (if pool-worker
-		(wake-up pool-worker function)
-		(enqueue function jobs-queue))))))
+	  (execute-single thread-pool function))))
 
 (defmethod pool-worker-finished ((thread-pool thread-pool) (pool-worker pool-worker) result)
   (with-slots (min-size keep-alive-time jobs-queue
