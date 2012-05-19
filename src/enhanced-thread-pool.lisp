@@ -152,13 +152,14 @@
 		  (when (not execute-function)
 		    (with-lock-held (lock)
 		      (sleep-down pool-worker)))
-		  (when execute-function
-		    (let ((result (handler-case
-				      (funcall execute-function)
-				    (error (condition) condition))))
-		      (setf execute-function nil)
-		      (setf last-used-time (get-universal-time))
-		      (pool-worker-finished thread-pool pool-worker result))))
+		  (let ((result (if execute-function
+				    (handler-case
+					(funcall execute-function)
+				      (error (condition) condition))
+				    'no-execution)))
+		    (setf execute-function nil)
+		    (setf last-used-time (get-universal-time))
+		    (pool-worker-finished thread-pool pool-worker result)))
 		(pool-worker-terminated thread-pool pool-worker)))))
     pool-worker))
 
