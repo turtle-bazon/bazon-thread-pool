@@ -241,14 +241,14 @@
 	pool-worker))))
 
 (defmethod execute ((thread-pool thread-pool) &rest functions)
-  (with-slots (running-p jobs-queue idle-workers workers-count max-size)
+  (with-slots (running-p jobs-queue idle-workers workers-count-lock workers-count max-size)
       thread-pool
     (iter (for function in functions)
-	  #+nil(when (and running-p
-			  (or (not max-size)
-			      (< workers-count max-size))
-			  (empty-p idle-workers))
-		 (execute-single thread-pool #'(lambda () (create-pool-worker thread-pool))))
+	  (when (and running-p
+		     (or (not max-size)
+			 (< (with-lock-held (workers-count-lock) workers-count) max-size))
+		     (empty-p idle-workers))
+	    (create-pool-worker thread-pool))
 	  (accumulate (execute-single thread-pool function) by #'and initial-value t))))
 
 (defmethod pool-worker-finished ((thread-pool thread-pool) (pool-worker pool-worker) result)
@@ -260,7 +260,7 @@
 	  (wake-up pool-worker function)
 	  (when running-p
 	    (push-object idle-workers pool-worker))))
-    #+nil(when (and running-p (> workers-count min-size))
+    (when (and running-p (> workers-count min-size))
       (let ((current-time (get-universal-time)))
 	(iter (for pool-worker-candidate = (peek-object idle-workers))
 	      (while (> workers-count min-size))

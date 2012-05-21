@@ -30,7 +30,7 @@
     (ensure-same t (enhanced-thread-pool::empty-p (slot-value thread-pool 'enhanced-thread-pool::idle-workers)) :report "pool-empty")
     (ensure-same threads-before-start (length (bordeaux-threads:all-threads))) :report "threads"))
 
-#+nil(addtest
+(addtest
     test-simple-pooling-condition
   (let ((threads-before-start (length (bordeaux-threads:all-threads)))
 	(result 0)
@@ -46,7 +46,7 @@
     (ensure-same t (enhanced-thread-pool::empty-p (slot-value thread-pool 'enhanced-thread-pool::idle-workers)) :report "pool-empty")
     (ensure-same threads-before-start (length (bordeaux-threads:all-threads)) :report "threads")))
 
-#+nil(addtest
+(addtest
     test-fixed-thread-pooling
   (let ((threads-before-start (length (bordeaux-threads:all-threads)))
 	(result 0)
@@ -63,9 +63,7 @@
     (ensure-same 3 result :report "result-1")
     (ensure-same 2 (slot-value thread-pool 'enhanced-thread-pool::workers-count) :report "workers-size-1")
     (stop-pool thread-pool)
-    (format t "Before join~%")
     (join-pool thread-pool)
-    (format t "After join~%")
     (ensure-same 10 result :report "result-2")
     (ensure-same 0 (slot-value thread-pool 'enhanced-thread-pool::workers-count) :report "workers-size-2")
     (ensure-same t (enhanced-thread-pool::empty-p (slot-value thread-pool 'enhanced-thread-pool::idle-workers)) :report "pool-empty")
@@ -96,7 +94,7 @@
     (ensure-same t (enhanced-thread-pool::empty-p (slot-value thread-pool 'enhanced-thread-pool::idle-workers)) :report "pool-empty")
     (ensure-same threads-before-start (length (bordeaux-threads:all-threads)) :report "threads")))
 
-#+nil(addtest
+(addtest
     test-agressive-pooling
   (let ((threads-before-start (length (bordeaux-threads:all-threads)))
 	(stress-size 1024)
@@ -106,7 +104,6 @@
     (start-pool thread-pool)
     (iter (for i from 1 to stress-size)
 	  (execute thread-pool (thread-function 0 lock result 1 nil)))
-    (sleep 3)
     (stop-pool thread-pool)
     (join-pool thread-pool)
     (ensure-same stress-size result :report "result")
