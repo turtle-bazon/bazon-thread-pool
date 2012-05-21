@@ -116,9 +116,11 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defmethod sleep-down ((pool-worker pool-worker))
-  (with-slots (lock condition)
+  (with-slots (lock condition running-p)
       pool-worker
-    (condition-wait condition lock)))
+    (with-lock-held (lock)
+      (when running-p
+	(condition-wait condition lock)))))
 
 (defmethod wake-up ((pool-worker pool-worker) function)
   (with-slots (execute-function condition)
@@ -151,9 +153,7 @@
 		(iter
 		  (while (or (and running-p thread-pool-running-p) execute-function))
 		  (when (not execute-function)
-		    (with-lock-held (lock)
-		      (when (and running-p thread-pool-running-p)
-			(sleep-down pool-worker))))
+		    (sleep-down pool-worker))
 		  (let ((result (if execute-function
 				    (handler-case
 					(funcall execute-function)
