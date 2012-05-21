@@ -268,7 +268,7 @@
 			 (> current-time (+ (slot-value pool-worker-candidate 'last-used-time) keep-alive-time))))
 	      (let ((pool-worker-actual (pop-object idle-workers)))
 		(when pool-worker-actual
-		  (remove-pool-worker thread-pool pool-worker))))))))
+		  (stop pool-worker))))))))
 
 (defmethod pool-worker-terminated ((thread-pool thread-pool) (pool-worker pool-worker))
   (with-slots (workers-set)
