@@ -14,7 +14,7 @@
 	     (bordeaux-threads:with-lock-held (,lock)
 	       (incf ,result ,addition-real)))))))
 
-(addtest
+#+nil(addtest
     test-simple-pooling
   (let ((threads-before-start (length (bordeaux-threads:all-threads)))
 	(result 0)
@@ -30,7 +30,7 @@
     (ensure-same t (enhanced-thread-pool::empty-p (slot-value thread-pool 'enhanced-thread-pool::idle-workers)) :report "pool-empty")
     (ensure-same threads-before-start (length (bordeaux-threads:all-threads))) :report "threads"))
 
-(addtest
+#+nil(addtest
     test-simple-pooling-condition
   (let ((threads-before-start (length (bordeaux-threads:all-threads)))
 	(result 0)
@@ -46,7 +46,7 @@
     (ensure-same t (enhanced-thread-pool::empty-p (slot-value thread-pool 'enhanced-thread-pool::idle-workers)) :report "pool-empty")
     (ensure-same threads-before-start (length (bordeaux-threads:all-threads)) :report "threads")))
 
-(addtest
+#+nil(addtest
     test-fixed-thread-pooling
   (let ((threads-before-start (length (bordeaux-threads:all-threads)))
 	(result 0)

@@ -196,7 +196,7 @@
     (handler-case
 	(let ((pool-worker (spawn-pool-worker thread-pool)))
 	  (push-object idle-workers pool-worker)
-	  (add-object workers-set pool-worker)
+ 	  (add-object workers-set pool-worker)
 	  pool-worker)
       (error () (decrease-workers thread-pool)))))
 
@@ -260,7 +260,7 @@
 	  (wake-up pool-worker function)
 	  (when running-p
 	    (push-object idle-workers pool-worker))))
-    (when (and running-p (> workers-count min-size))
+    #+nil(when (and running-p (> workers-count min-size))
       (let ((current-time (get-universal-time)))
 	(iter (for pool-worker-candidate = (peek-object idle-workers))
 	      (while (> workers-count min-size))
