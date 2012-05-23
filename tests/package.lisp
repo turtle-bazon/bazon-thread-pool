@@ -43,6 +43,8 @@
 				(length tests-failed-local)))))
 	(iter (for (test-result) in test-results)
 	      (describe-test-result test-result t))
+	(when (> (+ tests-failed tests-error) 0)
+	  (break))
 	(format t "~%Test Report for all tests: ~a All, ~a!"
 		tests-run
 		(if (or (> tests-failed 0) (> tests-error 0))
