@@ -34,6 +34,9 @@
 (defgeneric remove-object (collection object)
   (:documentation ""))
 
+(defgeneric filter (collection condition)
+  (:documentation ""))
+
 (defgeneric size (collection)
   (:documentation ""))
 
@@ -174,6 +177,11 @@
       blocking-stack
     (with-lock-held (lock)
       (setf stack (remove object stack)))))
+
+(defmethod filter ((blocking-stack blocking-stack) condition)
+  (with-slots (stack lock)
+      blocking-stack
+    (remove-if-not condition stack)))
 
 (defmethod empty-p ((blocking-stack blocking-stack))
   (with-slots (stack)

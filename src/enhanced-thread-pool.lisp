@@ -260,15 +260,16 @@
 	  (wake-up pool-worker function)
 	  (when running-p
 	    (push-object idle-workers pool-worker))))
-    #+nil(when (and running-p (> workers-count min-size))
-      (let ((current-time (get-universal-time)))
-	(iter (for pool-worker-candidate = (peek-object idle-workers))
+    (when (and running-p (> workers-count min-size) (not (empty-p idle-workers)))
+      (let ((worker-candidates (filter idle-workers
+				       #'(lambda (pool-worker)
+					   (and (> workers-count min-size)
+						(> (get-universal-time)
+						   (+ (slot-value pool-worker 'last-used-time)
+						      keep-alive-time)))))))
+	(iter (for pool-worker-candidate in worker-candidates)
 	      (while (> workers-count min-size))
-	      (when (and pool-worker-candidate
-			 (> current-time (+ (slot-value pool-worker-candidate 'last-used-time) keep-alive-time))))
-	      (let ((pool-worker-actual (pop-object idle-workers)))
-		(when pool-worker-actual
-		  (stop pool-worker))))))))
+	      (stop pool-worker-candidate))))))
 
 (defmethod pool-worker-terminated ((thread-pool thread-pool) (pool-worker pool-worker))
   (with-slots (workers-set)
