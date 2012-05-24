@@ -97,7 +97,7 @@
 (addtest
     test-agressive-pooling
   (let ((threads-before-start (length (bordeaux-threads:all-threads)))
-	(stress-size 4096)
+	(stress-size 1024)
 	(result 0)
 	(lock (bordeaux-threads:make-lock))
 	(thread-pool (make-cached-thread-pool "test" :size 16 :max-size 24 :keep-alive-time 1)))
