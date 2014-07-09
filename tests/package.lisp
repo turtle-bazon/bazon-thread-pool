@@ -17,11 +17,12 @@
 ;;;
 (defun run-all-tests ()
   (let* ((test-results (iter (for test-suite in (testsuites))
-			     (for test-name = (class-name test-suite))
+			     (for test-name = test-suite)
 			     (for should-run-tests = (not (or (equal test-name 'TEST-MIXIN)
+							      (equal test-name 'LOG-RESULTS-MIXIN)
 							      (equal test-name 'LIFT::PROCESS-TEST-MIXIN))))
 			     (for test-suite-results = (when should-run-tests
-							 (run-tests :suite test-name
+                					 (run-tests :suite test-name
 								    :report-pathname nil)))
 			     (when should-run-tests
 			       (collect

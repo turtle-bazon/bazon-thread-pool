@@ -68,12 +68,12 @@
     :initarg :keep-alive-time
     :documentation "Additional threads alive time, in seconds")
    (jobs-queue
-    :type blocking-queue
-    :initform (make-blocking-queue)
+    :type synchronized-queue
+    :initform (make-synchronized-queue)
     :documentation "Queue of jobs to execute")
    (idle-workers
-    :type blocking-stack
-    :initform (make-blocking-stack)
+    :type synchronized-stack
+    :initform (make-synchronized-stack)
     :documentation "Queue of idle workers")
    (workers-count-lock
     :initform (make-lock "workers count")
@@ -83,8 +83,8 @@
     :initform 0
     :documentation "Count of all spawned workers")
    (workers-set
-    :type blocking-hash-set
-    :initform (make-blocking-hash-set)
+    :type synchronized-hash-set
+    :initform (make-synchronized-hash-set)
     :documentation "All spawned workers set")
    (running-p
     :type boolean

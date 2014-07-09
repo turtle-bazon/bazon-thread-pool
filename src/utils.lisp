@@ -10,9 +10,9 @@
 	,@body)
     :name ,name))
 
-;;;;;;; Blocking collection
+;;;;;;; Synchronized collection
 
-(defclass blocking-collection ()
+(defclass synchronized-collection ()
   ((lock
     :initform (make-lock))))
 
@@ -47,32 +47,32 @@
   (:documentation ""))
 
 ;;;;;;; A simple, but efficient, queue implementation, by Paul Graham, ANSI Common Lisp
-;;;;;;; Modified to be blockable at simultaneous access
+;;;;;;; Modified to be synchronized at simultaneous access
 
-(defclass blocking-queue (blocking-collection)
+(defclass synchronized-queue (synchronized-collection)
   ((queue
     :initform (cons nil nil))))
 
-(defgeneric make-blocking-queue ()
+(defgeneric make-synchronized-queue ()
   (:documentation ""))
 
-(defgeneric enqueue (object blocking-queue)
+(defgeneric enqueue (object synchronized-queue)
   (:documentation ""))
 
-(defgeneric dequeue (blocking-queue)
+(defgeneric dequeue (synchronized-queue)
   (:documentation ""))
 
-(defgeneric peek-queue (blocking-queue)
+(defgeneric peek-queue (synchronized-queue)
   (:documentation ""))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(defmethod make-blocking-queue ()
-  (make-instance 'blocking-queue))
+(defmethod make-synchronized-queue ()
+  (make-instance 'synchronized-queue))
 
-(defmethod enqueue ((blocking-queue blocking-queue) object)
+(defmethod enqueue ((synchronized-queue synchronized-queue) object)
   (with-slots (queue lock)
-      blocking-queue
+      synchronized-queue
     (with-lock-held (lock)
       (if (null (car queue))
 	  (setf (cdr queue) (setf (car queue) (cons object nil)))
@@ -80,110 +80,110 @@
 		(cdr queue) (cdr (cdr queue))))
       (car queue))))
 
-(defmethod dequeue ((blocking-queue blocking-queue))
+(defmethod dequeue ((synchronized-queue synchronized-queue))
   (with-slots (queue lock)
-      blocking-queue
+      synchronized-queue
     (with-lock-held (lock)
       (pop (car queue)))))
 
-(defmethod peek-queue ((blocking-queue blocking-queue))
-  (car (car (slot-value blocking-queue 'queue))))
+(defmethod peek-queue ((synchronized-queue synchronized-queue))
+  (car (car (slot-value synchronized-queue 'queue))))
 
-(defmethod empty-p ((blocking-queue blocking-queue))
-  (null (car (slot-value blocking-queue 'queue))))
+(defmethod empty-p ((synchronized-queue synchronized-queue))
+  (null (car (slot-value synchronized-queue 'queue))))
 
-;;;;;;; Blocking hashset
+;;;;;;; Synchronized hashset
 
-(defclass blocking-hash-set (blocking-collection)
+(defclass synchronized-hash-set (synchronized-collection)
   ((hash-table
     :initform (make-hash-table))))
 
-(defgeneric make-blocking-hash-set ()
+(defgeneric make-synchronized-hash-set ()
   (:documentation ""))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(defmethod make-blocking-hash-set ()
-  (make-instance 'blocking-hash-set))
+(defmethod make-synchronized-hash-set ()
+  (make-instance 'synchronized-hash-set))
 
-(defmethod clear ((blocking-hash-set blocking-hash-set))
+(defmethod clear ((synchronized-hash-set synchronized-hash-set))
   (with-slots (hash-table lock)
-      blocking-hash-set
+      synchronized-hash-set
     (with-lock-held (lock)
       (clrhash hash-table))))
 
-(defmethod add-object ((blocking-hash-set blocking-hash-set) object)
+(defmethod add-object ((synchronized-hash-set synchronized-hash-set) object)
   (with-slots (hash-table lock)
-      blocking-hash-set
+      synchronized-hash-set
     (with-lock-held (lock)
       (setf (gethash object hash-table) t))))
 
-(defmethod remove-object ((blocking-hash-set blocking-hash-set) object)
+(defmethod remove-object ((synchronized-hash-set synchronized-hash-set) object)
   (with-slots (hash-table lock)
-      blocking-hash-set
+      synchronized-hash-set
     (with-lock-held (lock)
       (remhash object hash-table))))
 
-(defmethod size ((blocking-hash-set blocking-hash-set))
+(defmethod size ((synchronized-hash-set synchronized-hash-set))
   (with-slots (hash-table)
-      blocking-hash-set
+      synchronized-hash-set
     (hash-table-count hash-table)))
 
-(defmethod keys ((blocking-hash-set blocking-hash-set))
+(defmethod keys ((synchronized-hash-set synchronized-hash-set))
   (with-slots (hash-table)
-      blocking-hash-set
+      synchronized-hash-set
     (iter (for (key _) in-hashtable hash-table)
 	  (collect key))))
 
-;;;;;;; Blocking stack
+;;;;;;; Synchronized stack
 
-(defclass blocking-stack (blocking-collection)
+(defclass synchronized-stack (synchronized-collection)
   ((stack
     :initform nil)))
 
-(defgeneric make-blocking-stack ()
+(defgeneric make-synchronized-stack ()
   (:documentation ""))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(defmethod make-blocking-stack ()
-  (make-instance 'blocking-stack))
+(defmethod make-synchronized-stack ()
+  (make-instance 'synchronized-stack))
 
-(defmethod clear ((blocking-stack blocking-stack))
+(defmethod clear ((synchronized-stack synchronized-stack))
   (with-slots (stack lock)
-      blocking-stack
+      synchronized-stack
     (with-lock-held (lock)
       (setf stack nil))))
 
-(defmethod push-object ((blocking-stack blocking-stack) object)
+(defmethod push-object ((synchronized-stack synchronized-stack) object)
   (with-slots (stack lock)
-      blocking-stack
+      synchronized-stack
     (with-lock-held (lock)
       (push object stack))))
 
-(defmethod pop-object ((blocking-stack blocking-stack))
+(defmethod pop-object ((synchronized-stack synchronized-stack))
   (with-slots (stack lock)
-      blocking-stack
+      synchronized-stack
     (with-lock-held (lock)
       (pop stack))))
 
-(defmethod peek-object ((blocking-stack blocking-stack))
+(defmethod peek-object ((synchronized-stack synchronized-stack))
   (with-slots (stack)
-      blocking-stack
+      synchronized-stack
     (car stack)))
 
-(defmethod remove-object ((blocking-stack blocking-stack) object)
+(defmethod remove-object ((synchronized-stack synchronized-stack) object)
   (with-slots (stack lock)
-      blocking-stack
+      synchronized-stack
     (with-lock-held (lock)
       (setf stack (remove object stack)))))
 
-(defmethod filter ((blocking-stack blocking-stack) condition)
+(defmethod filter ((synchronized-stack synchronized-stack) condition)
   (with-slots (stack lock)
-      blocking-stack
+      synchronized-stack
     (remove-if-not condition stack)))
 
-(defmethod empty-p ((blocking-stack blocking-stack))
+(defmethod empty-p ((synchronized-stack synchronized-stack))
   (with-slots (stack)
-      blocking-stack
+      synchronized-stack
     (eq stack nil)))
