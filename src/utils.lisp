@@ -12,9 +12,8 @@
 
 ;;;;;;; Synchronized collection
 
-(defclass synchronized-collection ()
-  ((lock
-    :initform (make-lock))))
+(defclass collection ()
+  ())
 
 (defgeneric clear (collection)
   (:documentation ""))
@@ -106,6 +105,8 @@
    (not-full-condition
     :initform (make-condition-variable :name "not-full-condition"))))
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
 (defun make-blocking-queue (&optional queue-max-size)
   (make-instance 'blocking-queue :max-size queue-max-size))
 
@@ -136,129 +137,39 @@
     (with-lock-held (lock)
       (size internal-queue))))
 
-;;;;;;; Modified to be synchronized at simultaneous access
+;;;;;;; Hashset
 
-(defclass synchronized-queue (queue)
-  ((internal-queue
-    :initform (make-queue))
-   (lock
-    :initform (make-lock))))
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-(defun make-synchronized-queue ()
-  (make-instance 'synchronized-queue))
-
-(defmethod enqueue ((synchronized-queue synchronized-queue) object)
-  (with-slots (internal-queue lock)
-      synchronized-queue
-    (with-lock-held (lock)
-      (enqueue internal-queue object))))
-
-(defmethod dequeue ((synchronized-queue synchronized-queue))
-  (with-slots (internal-queue lock)
-      synchronized-queue
-    (with-lock-held (lock)
-      (dequeue internal-queue))))
-
-(defmethod size ((synchronized-queue synchronized-queue))
-  (with-slots (internal-queue lock)
-      synchronized-queue
-    (with-lock-held (lock)
-      (size internal-queue))))
-
-;;;;;;; Synchronized hashset
-
-(defclass synchronized-hash-set (synchronized-collection)
+(defclass hash-set (collection)
   ((hash-table
     :initform (make-hash-table))))
 
-(defgeneric make-synchronized-hash-set ()
-  (:documentation ""))
-
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(defmethod make-synchronized-hash-set ()
-  (make-instance 'synchronized-hash-set))
+(defun make-hash-set ()
+  (make-instance 'hash-set))
 
-(defmethod clear ((synchronized-hash-set synchronized-hash-set))
-  (with-slots (hash-table lock)
-      synchronized-hash-set
-    (with-lock-held (lock)
-      (clrhash hash-table))))
-
-(defmethod add-object ((synchronized-hash-set synchronized-hash-set) object)
-  (with-slots (hash-table lock)
-      synchronized-hash-set
-    (with-lock-held (lock)
-      (setf (gethash object hash-table) t))))
-
-(defmethod remove-object ((synchronized-hash-set synchronized-hash-set) object)
-  (with-slots (hash-table lock)
-      synchronized-hash-set
-    (with-lock-held (lock)
-      (remhash object hash-table))))
-
-(defmethod size ((synchronized-hash-set synchronized-hash-set))
+(defmethod clear ((hash-set hash-set))
   (with-slots (hash-table)
-      synchronized-hash-set
+      hash-set
+    (clrhash hash-table)))
+
+(defmethod add-object ((hash-set hash-set) object)
+  (with-slots (hash-table)
+      hash-set
+    (setf (gethash object hash-table) t)))
+
+(defmethod remove-object ((hash-set hash-set) object)
+  (with-slots (hash-table)
+      hash-set
+    (remhash object hash-table)))
+
+(defmethod size ((hash-set hash-set))
+  (with-slots (hash-table)
+      hash-set
     (hash-table-count hash-table)))
 
-(defmethod keys ((synchronized-hash-set synchronized-hash-set))
+(defmethod keys ((hash-set hash-set))
   (with-slots (hash-table)
-      synchronized-hash-set
+      hash-set
     (iter (for (key _) in-hashtable hash-table)
 	  (collect key))))
-
-;;;;;;; Synchronized stack
-
-(defclass synchronized-stack (synchronized-collection)
-  ((stack
-    :initform nil)))
-
-(defgeneric make-synchronized-stack ()
-  (:documentation ""))
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-(defmethod make-synchronized-stack ()
-  (make-instance 'synchronized-stack))
-
-(defmethod clear ((synchronized-stack synchronized-stack))
-  (with-slots (stack lock)
-      synchronized-stack
-    (with-lock-held (lock)
-      (setf stack nil))))
-
-(defmethod push-object ((synchronized-stack synchronized-stack) object)
-  (with-slots (stack lock)
-      synchronized-stack
-    (with-lock-held (lock)
-      (push object stack))))
-
-(defmethod pop-object ((synchronized-stack synchronized-stack))
-  (with-slots (stack lock)
-      synchronized-stack
-    (with-lock-held (lock)
-      (pop stack))))
-
-(defmethod peek-object ((synchronized-stack synchronized-stack))
-  (with-slots (stack)
-      synchronized-stack
-    (car stack)))
-
-(defmethod remove-object ((synchronized-stack synchronized-stack) object)
-  (with-slots (stack lock)
-      synchronized-stack
-    (with-lock-held (lock)
-      (setf stack (remove object stack)))))
-
-(defmethod filter ((synchronized-stack synchronized-stack) condition)
-  (with-slots (stack lock)
-      synchronized-stack
-    (remove-if-not condition stack)))
-
-(defmethod empty-p ((synchronized-stack synchronized-stack))
-  (with-slots (stack)
-      synchronized-stack
-    (eq stack nil)))

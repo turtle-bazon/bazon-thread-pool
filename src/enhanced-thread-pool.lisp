@@ -5,15 +5,15 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defclass pool-worker ()
-  ((execute-function
+  ((job-function
     :initform nil
-    :documentation "Function to be executed in thread")
+    :documentation "")
    (lock
-    :initform (make-lock "pool-worker lock")
+    :initform (make-lock "pool-worker-lock")
     :documentation "Worker lock (used in condition-wait)")
-   (condition
-    :initform (make-condition-variable :name "pool-worker condition")
-    :documentation "Condition variable (used in condition-wait)")
+   (job-available
+    :initform (make-condition-variable :name "job-available")
+    :documentation "")
    (thread
     :documentation "Thread, that holds parallel process to execute code")
    (last-used-time
@@ -23,13 +23,7 @@
    (running-p
     :type boolean
     :initform t
-    :documentation "Boolean determines is worker runing or should be stopped")))
-
-(defgeneric sleep-down (pool-worker)
-  (:documentation "Set worker to sleep state until any code wake up it"))
-
-(defgeneric wake-up (pool-worker function)
-  (:documentation "Wake up sleeping worker"))
+    :documentation "Boolean determines is worker running or should be stopped")))
 
 (defgeneric stop (pool-worker)
   (:documentation "Stop execution of worker"))
@@ -44,14 +38,6 @@
     :initarg :name
     :initform (error "Name must be provided")
     :documentation "Thread pool's name")
-   (f
-    :initform 0)
-   (f-lock
-    :initform (make-lock))
-   (f2
-    :initform 0)
-   (f2-lock
-    :initform (make-lock))
    (min-size
     :type integer
     :initarg :min-size
@@ -67,41 +53,48 @@
     :initform 60
     :initarg :keep-alive-time
     :documentation "Additional threads alive time, in seconds")
+   (manager-thread
+    :documentation "")
    (jobs-queue
-    :type synchronized-queue
-    :initform (make-synchronized-queue)
+    :type blocking-queue
+    :initform (make-queue)
     :documentation "Queue of jobs to execute")
-   (idle-workers
-    :type synchronized-stack
-    :initform (make-synchronized-stack)
-    :documentation "Queue of idle workers")
-   (workers-count-lock
-    :initform (make-lock "workers count")
-    :documentation "Lock used in updates of workers-count")
-   (workers-count
-    :type (integer 0 *)
-    :initform 0
-    :documentation "Count of all spawned workers")
+   (jobs-queue-lock
+    :initform (make-lock "jobs-queue-lock")
+    :documentation "Lock for jobs queue")
+   (jobs-queue-empty
+    :initform (make-condition-variable :name "jobs-queue-empty")
+    :documentation "")
+   (jobs-queue-not-empty
+    :initform (make-condition-variable :name "jobs-queue-not-empty")
+    :documentation "")
    (workers-set
-    :type synchronized-hash-set
-    :initform (make-synchronized-hash-set)
+    :type hash-set
+    :initform (make-hash-set)
     :documentation "All spawned workers set")
+   (idle-workers
+    :initform nil
+    :documentation "")
+   (workers-lock
+    :initform (make-lock "workers")
+    :documentation "Lock used to update workers-count and workers-set")
+   (idle-workers-available
+    :initform (make-condition-variable :name "idle-workers-available")
+    :documentation "")
+   (workers-empty
+    :initform (make-condition-variable :name "workers-empty")
+    :documentation "")
+   (shutdown-initiated-p
+    :type boolean
+    :initform nil
+    :documentation "")
    (running-p
     :type boolean
     :initform nil
     :documentation "Boolean determines is pool running or should be stopped")))
 
-(defgeneric increase-workers (thread-pool)
-  (:documentation "Increase workers count"))
-
-(defgeneric decrease-workers (thread-pool)
-  (:documentation "Decrease workers count"))
-
-(defgeneric create-pool-worker (thread-pool)
+(defgeneric create-pool-worker (thread-pool suffix)
   (:documentation "Create new pool worker when jobs will execute"))
-
-(defgeneric remove-pool-worker (thread-pool pool-worker)
-  (:documentation "Stop and remove pool worker from pool"))
 
 (defgeneric start-pool (thread-pool)
   (:documentation "Start pool, means spawn all necessary workers determined by min-size"))
@@ -115,32 +108,18 @@
 (defgeneric execute (thread-pool &rest functions)
   (:documentation "Execute function in any idle worker"))
 
-(defgeneric pool-worker-finished (thread-pool pool-worker result)
-  (:documentation "Callback on finish worker call"))
-
-(defgeneric pool-worker-terminated (thread-pool pool-worker)
-  (:documentation "Callback on terminating worker thread"))
-
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(defmethod sleep-down ((pool-worker pool-worker))
-  (with-slots (lock condition)
-      pool-worker
-    (with-lock-held (lock)
-      (condition-wait condition lock))))
-
-(defmethod wake-up ((pool-worker pool-worker) function)
-  (with-slots (execute-function condition)
-      pool-worker
-    (setf execute-function function)
-    (condition-notify condition)))
+(defun make-pool-worker ()
+  (make-instance 'pool-worker))
 
 (defmethod stop ((pool-worker pool-worker))
-  (with-slots (lock condition running-p)
+  (with-slots (lock thread job-function job-available running-p)
       pool-worker
     (with-lock-held (lock)
-      (setf running-p nil))
-    (condition-notify condition)))
+      (setf running-p nil)
+      (setf job-function 'skip)
+      (condition-notify job-available))))
 
 (defmethod join-worker-thread ((pool-worker pool-worker))
   (with-slots (thread)
@@ -149,33 +128,36 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(defun spawn-pool-worker (thread-pool)
-  (let ((pool-worker (make-instance 'pool-worker)))
-    (with-slots (execute-function thread lock last-used-time running-p)
-	pool-worker
-      (with-slots (name (thread-pool-running-p running-p) f f-lock f2 f2-lock)
-	  thread-pool
+(defun spawn-pool-worker (thread-pool suffix)
+  (with-slots (name
+	       workers-set idle-workers workers-lock idle-workers-available workers-empty
+	       running-p)
+      thread-pool
+    (let ((pool-worker (make-pool-worker)))
+      (with-slots (thread job-function lock job-available
+			  last-used-time (worker-running-p running-p))
+	  pool-worker
 	(setf thread
-	      (new-thread (format nil "~a pool worker" name)
-		(iter
-		  (while (or (and running-p thread-pool-running-p) execute-function))
-		  (when (not execute-function)
-		    (sleep-down pool-worker))
-		  (let ((result (if execute-function
-				    (handler-case
-					(funcall execute-function)
-				      (error (condition) condition))
-				    'no-execution)))
-		    (with-lock-held (f2-lock)
-		      (incf f2))
-		    (when execute-function
-		      (with-lock-held (f-lock)
-			(incf f)))
-		    (setf execute-function nil)
-		    (setf last-used-time (get-universal-time))
-		    (pool-worker-finished thread-pool pool-worker result)))
-		(pool-worker-terminated thread-pool pool-worker)))))
-    pool-worker))
+	      (new-thread (format nil "~a~a pool worker" name suffix)
+		(iter (while (and running-p worker-running-p))
+		      (with-lock-held (lock)
+			(iter (while (not job-function))
+			      (condition-wait job-available lock))
+			(unless (eq job-function 'skip)
+			  (handler-case
+			      (funcall job-function)
+			    (error (condition) condition))
+			  (setf last-used-time (get-universal-time))
+			  (setf job-function nil)
+			  (with-lock-held (workers-lock)
+                            (push pool-worker idle-workers)
+                            (condition-notify idle-workers-available)))))
+		(with-lock-held (workers-lock)
+                  (remove-object workers-set pool-worker)
+                  (setf idle-workers (remove pool-worker idle-workers))
+		  (when (= (size workers-set) 0)
+                    (condition-notify workers-empty))))))
+      pool-worker)))
 
 (defmethod initialize-instance :after ((thread-pool thread-pool) &key)
   (with-slots (min-size max-size)
@@ -187,105 +169,87 @@
   (make-instance 'thread-pool :name name :min-size size))
 
 (defun make-cached-thread-pool (name &optional &key (size 1) (max-size 2) (keep-alive-time 60))
-  (make-instance 'thread-pool :name name :min-size size :max-size max-size :keep-alive-time keep-alive-time))
+  (make-instance 'thread-pool :name name :min-size size :max-size max-size
+		 :keep-alive-time keep-alive-time))
 
-(defmethod increase-workers ((thread-pool thread-pool))
-  (with-slots (workers-count-lock workers-count)
+(defmethod create-pool-worker ((thread-pool thread-pool) suffix)
+  (with-slots (workers-set idle-workers idle-workers-available)
       thread-pool
-    (with-lock-held (workers-count-lock)
-      (incf workers-count))))
-
-(defmethod decrease-workers ((thread-pool thread-pool))
-  (with-slots (workers-count-lock workers-count)
-      thread-pool
-    (with-lock-held (workers-count-lock)
-      (decf workers-count))))
-
-(defmethod create-pool-worker ((thread-pool thread-pool))
-  (with-slots (idle-workers workers-set)
-      thread-pool
-    (increase-workers thread-pool)
-    (handler-case
-	(let ((pool-worker (spawn-pool-worker thread-pool)))
-	  (push-object idle-workers pool-worker)
- 	  (add-object workers-set pool-worker)
-	  pool-worker)
-      (error () (decrease-workers thread-pool)))))
-
-(defmethod remove-pool-worker ((thread-pool thread-pool) (pool-worker pool-worker))
-  (with-slots (idle-workers workers-set)
-      thread-pool
-    (stop pool-worker)
-    (remove-object idle-workers pool-worker)
-    (remove-object workers-set pool-worker)
-    (decrease-workers thread-pool)))
+    (let ((pool-worker (spawn-pool-worker thread-pool suffix)))
+      (handler-case
+	  (progn
+	    (add-object workers-set pool-worker)
+	    (push pool-worker idle-workers)
+	    (condition-notify idle-workers-available)
+	    pool-worker)
+	(error () (stop pool-worker))))))
 
 (defmethod start-pool ((thread-pool thread-pool))
-  (with-slots (running-p min-size)
+  (with-slots (min-size max-size manager-thread
+			jobs-queue jobs-queue-lock jobs-queue-empty jobs-queue-not-empty
+			workers-set idle-workers workers-lock idle-workers-available
+			shutdown-initiated-p running-p)
       thread-pool
     (unless running-p
+      (setf shutdown-initiated-p nil)
       (setf running-p t)
-      (iter (for i from 1 to min-size)
-	    (collect (create-pool-worker thread-pool))))))
+      (with-lock-held (workers-lock)
+	(iter (for i from 1 to min-size)
+	      (create-pool-worker thread-pool "")))
+      (setf manager-thread
+	    (new-thread "Thread pool manager"
+	      (iter (while (or running-p (> (size jobs-queue) 0)))
+		    (let ((free-worker (with-lock-held (workers-lock)
+                                         (iter (while (and running-p (eq idle-workers nil)))
+					       (if (< (size workers-set) max-size)
+						   (create-pool-worker thread-pool "-add")
+						   (condition-wait idle-workers-available workers-lock)))
+                                         (pop idle-workers)))
+			  (next-job (with-lock-held (jobs-queue-lock)
+				      (iter (while (and running-p (= (size jobs-queue) 0)))
+					    (condition-wait jobs-queue-not-empty jobs-queue-lock))
+				      (let ((result (dequeue jobs-queue)))
+					(when (= (size jobs-queue) 0)
+					  (condition-notify jobs-queue-empty))
+					result))))
+		      (when (and free-worker next-job)
+			(with-slots (job-function lock job-available)
+			    free-worker
+			  (with-lock-held (lock)
+			    (setf job-function next-job)
+			    (condition-notify job-available)))))))))))
 
 (defmethod stop-pool ((thread-pool thread-pool))
-  (with-slots (running-p workers-set)
+  (with-slots (jobs-queue jobs-queue-lock jobs-queue-empty jobs-queue-not-empty
+			  workers-set idle-workers-available workers-lock workers-empty
+			  shutdown-initiated-p running-p)
       thread-pool
+    (setf shutdown-initiated-p t)
+    (with-lock-held (jobs-queue-lock)
+      (iter (while (> (size jobs-queue) 0))
+	    (condition-wait jobs-queue-empty jobs-queue-lock)))
     (setf running-p nil)
-    (iter (for pool-worker in (keys workers-set))
-	  (stop pool-worker))))
+    (iter (for pool-worker in (with-lock-held (workers-lock)
+				(keys workers-set)))
+	  (stop pool-worker))
+    (with-lock-held (workers-lock)
+      (iter (while (> (size workers-set) 0))
+	    (condition-wait workers-empty workers-lock)))
+    (condition-notify idle-workers-available)
+    (condition-notify jobs-queue-not-empty)))
 
 (defmethod join-pool ((thread-pool thread-pool))
-  (with-slots (workers-set f f2)
+  (with-slots (manager-thread)
       thread-pool
-    (iter (while (> (size workers-set) 0))
-	  (iter (for pool-worker in (keys workers-set))
-		(join-worker-thread pool-worker)))
-    (format t "F: ~a~%" f)
-    (format t "F2: ~a~%" f2)
-    ))
-
-(defun execute-single (thread-pool function)
-  (with-slots (running-p jobs-queue idle-workers)
-      thread-pool
-    (when running-p
-      (let ((pool-worker (pop-object idle-workers)))
-	(if pool-worker
-	    (wake-up pool-worker function)
-	    (enqueue jobs-queue function))
-	pool-worker))))
+    (join-thread manager-thread)))
 
 (defmethod execute ((thread-pool thread-pool) &rest functions)
-  (with-slots (running-p jobs-queue idle-workers workers-count-lock workers-count max-size)
+  (with-slots (max-size
+	       jobs-queue jobs-queue-lock jobs-queue-not-empty
+	       shutdown-initiated-p running-p)
       thread-pool
-    (iter (for function in functions)
-	  #+nil(when (and running-p
-		     (or (not max-size)
-			 (< (with-lock-held (workers-count-lock) workers-count) max-size))
-		     (empty-p idle-workers))
-	    (create-pool-worker thread-pool))
-	  (accumulate (execute-single thread-pool function) by #'and initial-value t))))
-
-(defmethod pool-worker-finished ((thread-pool thread-pool) (pool-worker pool-worker) result)
-  (with-slots (min-size keep-alive-time jobs-queue running-p
-			idle-workers workers-count)
-      thread-pool
-    (let ((function (dequeue jobs-queue)))
-      (if function
-	  (wake-up pool-worker function)
-	  (push-object idle-workers pool-worker)))
-    #+nil(when (and running-p (> workers-count min-size) (not (empty-p idle-workers)))
-      (let ((worker-candidates (filter idle-workers
-				       #'(lambda (pool-worker)
-					   (and (> workers-count min-size)
-						(> (get-universal-time)
-						   (+ (slot-value pool-worker 'last-used-time)
-						      keep-alive-time)))))))
-	(iter (for pool-worker-candidate in worker-candidates)
-	      (while (> workers-count min-size))
-	      (stop pool-worker-candidate))))))
-
-(defmethod pool-worker-terminated ((thread-pool thread-pool) (pool-worker pool-worker))
-  (with-slots (workers-set)
-      thread-pool
-    (remove-pool-worker thread-pool pool-worker)))
+    (unless shutdown-initiated-p
+      (iter (for function in functions)
+	    (with-lock-held (jobs-queue-lock)
+	      (enqueue jobs-queue function)
+	      (condition-notify jobs-queue-not-empty))))))
