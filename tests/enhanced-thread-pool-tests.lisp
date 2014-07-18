@@ -96,14 +96,14 @@
 
 (addtest
     test-agressive-pooling
-  (iter (for i from 1 to 32)
+  (iter (for i from 1 to 1)
 	(let ((stress-size 1024)
 	      (result 0)
 	      (lock (bordeaux-threads:make-lock))
 	      (thread-pool (make-cached-thread-pool "test" :size 16 :max-size 24 :keep-alive-time 1)))
 	  (start-pool thread-pool)
 	  (iter (for i from 1 to stress-size)
-		(execute thread-pool (thread-function 0 lock result 1 nil)))
+		(execute thread-pool (thread-function 0.01 lock result 1 nil)))
 	  (stop-pool thread-pool)
 	  (join-pool thread-pool)
 	  (ensure-same stress-size result :report "result")

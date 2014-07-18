@@ -11,6 +11,9 @@
    (lock
     :initform (make-lock "pool-worker-lock")
     :documentation "Worker lock (used in condition-wait)")
+   (worker-idle
+    :initform (make-condition-variable :name "worker-idle")
+    :documentation "")
    (job-available
     :initform (make-condition-variable :name "job-available")
     :documentation "")
@@ -114,10 +117,12 @@
   (make-instance 'pool-worker))
 
 (defmethod stop ((pool-worker pool-worker))
-  (with-slots (lock thread job-function job-available running-p)
+  (with-slots (lock worker-idle thread job-function job-available running-p)
       pool-worker
     (with-lock-held (lock)
       (setf running-p nil)
+      (iter (while job-function)
+	    (condition-wait worker-idle lock))
       (setf job-function 'skip)
       (condition-notify job-available))))
 
@@ -134,7 +139,7 @@
 	       running-p)
       thread-pool
     (let ((pool-worker (make-pool-worker)))
-      (with-slots (thread job-function lock job-available
+      (with-slots (thread job-function lock worker-idle job-available
 			  last-used-time (worker-running-p running-p))
 	  pool-worker
 	(setf thread
@@ -151,7 +156,8 @@
 			  (setf job-function nil)
 			  (with-lock-held (workers-lock)
                             (push pool-worker idle-workers)
-                            (condition-notify idle-workers-available)))))
+                            (condition-notify idle-workers-available))
+			  (condition-notify worker-idle))))
 		(with-lock-held (workers-lock)
                   (remove-object workers-set pool-worker)
                   (setf idle-workers (remove pool-worker idle-workers))
@@ -198,7 +204,7 @@
 	      (create-pool-worker thread-pool "")))
       (setf manager-thread
 	    (new-thread "Thread pool manager"
-	      (iter (while (or running-p (> (size jobs-queue) 0)))
+	      (iter (while running-p)
 		    (let ((free-worker (with-lock-held (workers-lock)
                                          (iter (while (and running-p (eq idle-workers nil)))
 					       (if (< (size workers-set) max-size)
@@ -208,16 +214,16 @@
 			  (next-job (with-lock-held (jobs-queue-lock)
 				      (iter (while (and running-p (= (size jobs-queue) 0)))
 					    (condition-wait jobs-queue-not-empty jobs-queue-lock))
-				      (let ((result (dequeue jobs-queue)))
-					(when (= (size jobs-queue) 0)
-					  (condition-notify jobs-queue-empty))
-					result))))
+				      (dequeue jobs-queue))))
 		      (when (and free-worker next-job)
 			(with-slots (job-function lock job-available)
 			    free-worker
 			  (with-lock-held (lock)
 			    (setf job-function next-job)
-			    (condition-notify job-available)))))))))))
+			    (condition-notify job-available))))
+		      (with-lock-held (jobs-queue-lock)
+			(when (= (size jobs-queue) 0)
+                          (condition-notify jobs-queue-empty))))))))))
 
 (defmethod stop-pool ((thread-pool thread-pool))
   (with-slots (jobs-queue jobs-queue-lock jobs-queue-empty jobs-queue-not-empty
@@ -249,7 +255,7 @@
 	       shutdown-initiated-p running-p)
       thread-pool
     (unless shutdown-initiated-p
-      (iter (for function in functions)
-	    (with-lock-held (jobs-queue-lock)
+      (with-lock-held (jobs-queue-lock)
+        (iter (for function in functions)
 	      (enqueue jobs-queue function)
 	      (condition-notify jobs-queue-not-empty))))))
