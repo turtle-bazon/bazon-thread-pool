@@ -71,8 +71,7 @@
 
 #+nil(addtest
     test-cached-thread-pooling
-  (let ((threads-before-start (length (bordeaux-threads:all-threads)))
-	(result 0)
+  (let ((result 0)
 	(lock (bordeaux-threads:make-lock))
 	(thread-pool (make-cached-thread-pool "test" :size 2 :max-size 4 :keep-alive-time 1)))
     (start-pool thread-pool)
@@ -82,17 +81,16 @@
     (execute thread-pool (thread-function 2 lock result 4 nil))
     (execute thread-pool (thread-function 2 lock result 5 nil))
     (sleep 2.5)
-    (ensure-same 4 (slot-value thread-pool 'enhanced-thread-pool::workers-count) :report "workers-size-1")
-    (sleep 2)
-    (ensure-same 2 (slot-value thread-pool 'enhanced-thread-pool::workers-count) :report "workers-size-2")
-    (sleep 2)
-    (ensure-same 2 (slot-value thread-pool 'enhanced-thread-pool::workers-count) :report "workers-size-3")
+    (ensure-same 4 (enhanced-thread-pool::size (slot-value thread-pool 'enhanced-thread-pool::workers-set)) :report "workers-size-1")
+    ;(sleep 2)
+    ;(ensure-same 2 (enhanced-thread-pool::size (slot-value thread-pool 'enhanced-thread-pool::workers-set)) :report "workers-size-2")
+    ;(sleep 2)
+    ;(ensure-same 2 (enhanced-thread-pool::size (slot-value thread-pool 'enhanced-thread-pool::workers-set)) :report "workers-size-3")
     (stop-pool thread-pool)
     (join-pool thread-pool)
     (ensure-same 15 result :report "result")
-    (ensure-same 0 (slot-value thread-pool 'enhanced-thread-pool::workers-count) :report "workers-size-4")
-    (ensure-same t (enhanced-thread-pool::empty-p (slot-value thread-pool 'enhanced-thread-pool::idle-workers)) :report "pool-empty")
-    (ensure-same threads-before-start (length (bordeaux-threads:all-threads)) :report "threads")))
+    (ensure-same 0 (enhanced-thread-pool::size (slot-value thread-pool 'enhanced-thread-pool::workers-set)) :report "workers-size-4")
+    (ensure-same 0 (length (slot-value thread-pool 'enhanced-thread-pool::idle-workers)) :report "pool-empty")))
 
 (addtest
     test-agressive-pooling
