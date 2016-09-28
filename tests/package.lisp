@@ -1,16 +1,16 @@
 ;;; -*- lisp -*-
 
-(defpackage :ru.bazon.enhanced-thread-pool-tests
-  (:nicknames :enhanced-thread-pool-tests)
+(defpackage :ru.bazon.thread-pool-tests
+  (:nicknames :bazon-thread-pool-tests)
   (:use :cl
-	:enhanced-thread-pool
+	:bazon-thread-pool
 	:lift
 	:iterate)
   (:export
    :run-all-tests)
   (:documentation "An enhanced thread pool system (test package)"))
 
-(in-package :ru.bazon.enhanced-thread-pool-tests)
+(in-package :ru.bazon.thread-pool-tests)
 
 ;;;
 ;;; run-tests

@@ -1,7 +1,7 @@
 ;;; -*- lisp -*-
 
-(defpackage :ru.bazon.enhanced-thread-pool
-  (:nicknames :enhanced-thread-pool)
+(defpackage :ru.bazon.thread-pool
+  (:nicknames :bazon-thread-pool)
   (:use :cl
 	:iterate
 	:bordeaux-threads)
@@ -14,4 +14,4 @@
 
    :make-fixed-thread-pool
    :make-cached-thread-pool)
-  (:documentation "An enhanced thread pool system"))
+  (:documentation "An thread pool system"))

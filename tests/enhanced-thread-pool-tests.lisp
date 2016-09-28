@@ -1,8 +1,8 @@
 ;;; -*- lisp -*-
 
-(in-package :ru.bazon.enhanced-thread-pool-tests)
+(in-package :ru.bazon.thread-pool-tests)
 
-(deftestsuite test-enhanced-thread-pool () ())
+(deftestsuite test-bazon-thread-pool () ())
 
 (defmacro thread-function (sleep-time lock result addition condition)
   (let ((addition-real addition))
@@ -26,8 +26,8 @@
     (stop-pool thread-pool)
     (join-pool thread-pool)
     (ensure-same 3 result :report "result")
-    (ensure-same 0 (slot-value thread-pool 'enhanced-thread-pool::workers-count) :report "workers-size")
-    (ensure-same t (enhanced-thread-pool::empty-p (slot-value thread-pool 'enhanced-thread-pool::idle-workers)) :report "pool-empty")
+    (ensure-same 0 (slot-value thread-pool 'bazon-thread-pool::workers-count) :report "workers-size")
+    (ensure-same t (bazon-thread-pool::empty-p (slot-value thread-pool 'bazon-thread-pool::idle-workers)) :report "pool-empty")
     (ensure-same threads-before-start (length (bordeaux-threads:all-threads))) :report "threads"))
 
 #+nil(addtest
@@ -42,8 +42,8 @@
     (stop-pool thread-pool)
     (join-pool thread-pool)
     (ensure-same 1 result)
-    (ensure-same 0 (slot-value thread-pool 'enhanced-thread-pool::workers-count) :report "workers-size")
-    (ensure-same t (enhanced-thread-pool::empty-p (slot-value thread-pool 'enhanced-thread-pool::idle-workers)) :report "pool-empty")
+    (ensure-same 0 (slot-value thread-pool 'bazon-thread-pool::workers-count) :report "workers-size")
+    (ensure-same t (bazon-thread-pool::empty-p (slot-value thread-pool 'bazon-thread-pool::idle-workers)) :report "pool-empty")
     (ensure-same threads-before-start (length (bordeaux-threads:all-threads)) :report "threads")))
 
 #+nil(addtest
@@ -61,12 +61,12 @@
     (execute thread-pool (thread-function 2 lock result 4 nil))
     (sleep 2)
     (ensure-same 3 result :report "result-1")
-    (ensure-same 2 (slot-value thread-pool 'enhanced-thread-pool::workers-count) :report "workers-size-1")
+    (ensure-same 2 (slot-value thread-pool 'bazon-thread-pool::workers-count) :report "workers-size-1")
     (stop-pool thread-pool)
     (join-pool thread-pool)
     (ensure-same 10 result :report "result-2")
-    (ensure-same 0 (slot-value thread-pool 'enhanced-thread-pool::workers-count) :report "workers-size-2")
-    (ensure-same t (enhanced-thread-pool::empty-p (slot-value thread-pool 'enhanced-thread-pool::idle-workers)) :report "pool-empty")
+    (ensure-same 0 (slot-value thread-pool 'bazon-thread-pool::workers-count) :report "workers-size-2")
+    (ensure-same t (bazon-thread-pool::empty-p (slot-value thread-pool 'bazon-thread-pool::idle-workers)) :report "pool-empty")
     (ensure-same threads-before-start (length (bordeaux-threads:all-threads)) :report "threads")))
 
 #+nil(addtest
@@ -81,16 +81,16 @@
     (execute thread-pool (thread-function 2 lock result 4 nil))
     (execute thread-pool (thread-function 2 lock result 5 nil))
     (sleep 2.5)
-    (ensure-same 4 (enhanced-thread-pool::size (slot-value thread-pool 'enhanced-thread-pool::workers-set)) :report "workers-size-1")
+    (ensure-same 4 (bazon-thread-pool::size (slot-value thread-pool 'bazon-thread-pool::workers-set)) :report "workers-size-1")
     ;(sleep 2)
-    ;(ensure-same 2 (enhanced-thread-pool::size (slot-value thread-pool 'enhanced-thread-pool::workers-set)) :report "workers-size-2")
+    ;(ensure-same 2 (bazon-thread-pool::size (slot-value thread-pool 'bazon-thread-pool::workers-set)) :report "workers-size-2")
     ;(sleep 2)
-    ;(ensure-same 2 (enhanced-thread-pool::size (slot-value thread-pool 'enhanced-thread-pool::workers-set)) :report "workers-size-3")
+    ;(ensure-same 2 (bazon-thread-pool::size (slot-value thread-pool 'bazon-thread-pool::workers-set)) :report "workers-size-3")
     (stop-pool thread-pool)
     (join-pool thread-pool)
     (ensure-same 15 result :report "result")
-    (ensure-same 0 (enhanced-thread-pool::size (slot-value thread-pool 'enhanced-thread-pool::workers-set)) :report "workers-size-4")
-    (ensure-same 0 (length (slot-value thread-pool 'enhanced-thread-pool::idle-workers)) :report "pool-empty")))
+    (ensure-same 0 (bazon-thread-pool::size (slot-value thread-pool 'bazon-thread-pool::workers-set)) :report "workers-size-4")
+    (ensure-same 0 (length (slot-value thread-pool 'bazon-thread-pool::idle-workers)) :report "pool-empty")))
 
 (addtest
     test-agressive-pooling
@@ -105,8 +105,8 @@
 	  (stop-pool thread-pool)
 	  (join-pool thread-pool)
 	  (ensure-same stress-size result :report "result")
-	  (ensure-same 0 (enhanced-thread-pool::size (slot-value thread-pool 'enhanced-thread-pool::workers-set)) :report "workers-size")
-	  (ensure-same 0 (length (slot-value thread-pool 'enhanced-thread-pool::idle-workers)) :report "pool-empty"))))
+	  (ensure-same 0 (bazon-thread-pool::size (slot-value thread-pool 'bazon-thread-pool::workers-set)) :report "workers-size")
+	  (ensure-same 0 (length (slot-value thread-pool 'bazon-thread-pool::idle-workers)) :report "pool-empty"))))
 
 
 

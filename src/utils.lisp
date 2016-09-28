@@ -1,6 +1,6 @@
 ;;;; -*- mode: lisp -*-
 
-(in-package :ru.bazon.enhanced-thread-pool)
+(in-package :ru.bazon.thread-pool)
 
 ;;;;;;; Simplify thread creation
 
