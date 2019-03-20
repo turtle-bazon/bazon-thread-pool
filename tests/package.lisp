@@ -2,10 +2,12 @@
 
 (defpackage :ru.bazon.thread-pool-tests
   (:nicknames :bazon-thread-pool-tests)
-  (:use :cl
-	:bazon-thread-pool
-	:lift
-	:iterate)
+  (:use
+   :cl
+   :bazon-collections
+   :bazon-thread-pool
+   :lift
+   :iterate)
   (:export
    :run-all-tests)
   (:documentation "An enhanced thread pool system (test package)"))
@@ -44,7 +46,7 @@
 				(length tests-failed-local)))))
 	(iter (for (test-result) in test-results)
 	      (describe-test-result test-result t))
-	(when (> (+ tests-failed tests-error) 0)
+	#+nil(when (> (+ tests-failed tests-error) 0)
 	  (break))
 	(format t "~%Test Report for all tests: ~a All, ~a!"
 		tests-run

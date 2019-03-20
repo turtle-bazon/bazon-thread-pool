@@ -6,13 +6,17 @@
   :licence "Lessor Lisp General Public License"
   :version "0.0.1.0"
   :description ""
-  :depends-on (:bordeaux-threads :iterate)
+  :depends-on (:bazon-collections
+               :bordeaux-threads
+               :iterate)
   :components ((:module src
                         :components
 			((:file "package")
-			 (:file "utils" :depends-on ("package"))
-			 (:file "bazon-thread-pool" :depends-on ("package"
-								    "utils")))))
+                         (:file "pool-worker"
+                          :depends-on ("package"))
+			 (:file "thread-pool"
+                          :depends-on ("package"
+                                       "pool-worker")))))
   :in-order-to ((test-op (test-op bazon-thread-pool-tests)))
   :perform (test-op :after (op c)
 		    (funcall

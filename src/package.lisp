@@ -1,10 +1,8 @@
 ;;; -*- lisp -*-
 
 (defpackage :ru.bazon.thread-pool
-  (:nicknames :bazon-thread-pool)
-  (:use :cl
-	:iterate
-	:bordeaux-threads)
+  (:nicknames :bazon-thread-pool :btp)
+  (:use :bazon-collections :cl :iterate :bordeaux-threads)
   (:export
    :start-pool
    :stop-pool
