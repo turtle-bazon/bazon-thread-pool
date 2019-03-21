@@ -22,12 +22,13 @@
     :initform 60
     :initarg :keep-alive-time
     :documentation "Additional threads alive time, in seconds")
-   (manager-thread
-    :documentation "")
    (jobs-queue
     :type blocking-queue
     :initform (make-instance 'blocking-queue :back-queue (make-instance 'simple-queue))
     :documentation "Queue of jobs to execute")
+   (worker-next-id
+    :type integer
+    :documentation "Next id for pool-worker")
    (workers-set
     :type hash-set
     :initform (make-instance 'hash-set)
@@ -54,53 +55,6 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-#+nil(defun spawn-pool-worker (thread-pool suffix)
-  (with-slots (name
-	       workers-set idle-workers workers-lock idle-workers-available workers-empty
-	       min-size min-used-time keep-alive-time running-p)
-      thread-pool
-    (let ((pool-worker (make-pool-worker)))
-      (with-slots (thread job-function lock worker-idle job-available
-			  last-used-time (worker-running-p running-p))
-	  pool-worker
-	(setf thread
-              (make-thread
-               (lambda ()
-                 (iter (while (and running-p worker-running-p))
-                       (with-lock-held (lock)
-                         (iter (while (not job-function))
-                               (condition-wait job-available lock))
-                         (unless (eq job-function 'skip)
-                           (handler-case
-                               (funcall job-function)
-                             (error (condition) condition))
-                           (let ((now (get-universal-time)))
-                             (setf last-used-time now)
-                             (setf job-function nil)
-                             (with-lock-held (workers-lock)
-                               (when (> (- now min-used-time) keep-alive-time)
-                                 (iter (for idle-worker in idle-workers)
-                                       (with-slots ((iw-last-used-time last-used-time)
-                                                    (iw-running-p running-p)
-                                                    (iw-job-function job-function)
-                                                    (iw-job-available job-available))
-                                           idle-worker
-                                         (when (and (> (- now iw-last-used-time) keep-alive-time)
-                                                    (> (size workers-set) min-size))
-                                           (setf iw-running-p nil)
-                                           (setf iw-job-function 'skip)
-                                           (condition-notify iw-job-available)))))
-                               (push pool-worker idle-workers)
-                               (condition-notify idle-workers-available)
-                               (condition-notify worker-idle))))))
-                 (with-lock-held (workers-lock)
-                   (remove-object workers-set pool-worker)
-                   (setf idle-workers (remove pool-worker idle-workers))
-                   (when (= (size workers-set) 0)
-                     (condition-notify workers-empty))))
-               :name (format nil "~a~a pool worker" name suffix))))
-      pool-worker)))
-
 (defmethod initialize-instance :after ((thread-pool thread-pool) &key)
   (with-slots (size max-size)
       thread-pool
@@ -115,8 +69,16 @@
   (make-instance 'thread-pool :name name :size size :max-size max-size
 		 :keep-alive-time keep-alive-time))
 
+(defun create-worker (thread-pool index)
+  (with-slots (name)
+      thread-pool
+    (make-instance
+     'pool-worker
+     :thread-pool thread-pool
+     :name (format nil "thread-pool ~a worker ~a" name index))))
+
 (defmethod start-pool ((thread-pool thread-pool))
-  (with-slots (name size max-size
+  (with-slots (name size max-size worker-next-id
                workers-set workers-lock running-p)
       thread-pool
     (unless running-p
@@ -124,11 +86,9 @@
       (with-lock-held (workers-lock)
         (clear workers-set)
 	(iter (for i from 1 to size)
-              (for pw = (make-instance
-                         'pool-worker
-                         :thread-pool thread-pool
-                         :name (format nil "thread-pool ~a worker ~a" name i)))
-	      (add-object workers-set pw))))))
+              (for pw = (create-worker thread-pool i))
+	      (add-object workers-set pw))
+        (setf worker-next-id (+ size 1))))))
 
 (defmethod stop-pool ((thread-pool thread-pool))
   (with-slots (jobs-queue workers-set workers-lock running-p)
@@ -138,21 +98,57 @@
       (iter (with pw-it = (iterator workers-set))
             (while (it-next pw-it))
             (for pool-worker = (it-current pw-it))
-            (stop pool-worker)
+            (stop-worker pool-worker))
+      (iter (repeat (size workers-set))
             (enqueue-object jobs-queue nil)))))
 
 (defmethod join-pool ((thread-pool thread-pool))
-  (with-slots (manager-thread workers-set)
+  (with-slots (workers-set)
       thread-pool
-    #+nil(join-thread manager-thread)
     (iter (with ws-it = (iterator workers-set))
           (while (it-next ws-it))
           (for pool-worker = (it-current ws-it))
-          (join-worker-thread pool-worker))))
+          (join-worker pool-worker))))
+
+(defun increase-workers (thread-pool deficit-count)
+  (with-slots (name max-size worker-next-id workers-set)
+      thread-pool
+    (iter (repeat deficit-count)
+          (for i from worker-next-id)
+          (while (<= i max-size))
+          (for pw = (create-worker thread-pool i))
+          (incf worker-next-id)
+          (add-object workers-set pw))))
+
+(defun decrease-workers (thread-pool proficit-count)
+  (with-slots (workers-set keep-alive-time)
+      thread-pool
+    (iter (with removed-count = 0)
+          (with pw-it = (iterator workers-set))
+          (while (< removed-count proficit-count))
+          (while (it-next pw-it))
+          (for pool-worker = (it-current pw-it))
+          (with-slots (name state last-used-time)
+              pool-worker
+            (unless (eq :executing-job state)
+              (let ((now (get-universal-time)))
+                (when (> (- now last-used-time) keep-alive-time)
+                  (terminate-worker pool-worker)
+                  (remove-object workers-set pw-it)
+                  (incf removed-count))))))))
 
 (defmethod execute ((thread-pool thread-pool) &rest functions)
-  (with-slots (jobs-queue running-p)
+  (with-slots (size max-size jobs-queue workers-set workers-lock running-p)
       thread-pool
     (when running-p
+      (with-lock-held (workers-lock)
+        (when (and (> max-size size)
+                   (> (size jobs-queue) 0)
+                   (< (size workers-set) max-size))
+          (increase-workers thread-pool (size jobs-queue)))
+        (when (and (> max-size size)
+                   (= (size jobs-queue) 0)
+                   (> (size workers-set) size))
+          (decrease-workers thread-pool (- (size workers-set) size))))
       (iter (for function in functions)
             (enqueue-object jobs-queue function)))))

@@ -6,7 +6,10 @@
   :licence "Lessor Lisp General Public License"
   :version "0.0.1.0"
   :description ""
-  :depends-on (:bazon-thread-pool :lift :bordeaux-threads :iterate)
+  :depends-on (:bazon-thread-pool
+               :bordeaux-threads
+               :fiveam
+               :iterate)
   :components ((:module tests
                         :components
 			((:file "package")
