@@ -88,7 +88,8 @@
 	(iter (for i from 1 to size)
               (for pw = (create-worker thread-pool i))
 	      (add-object workers-set pw))
-        (setf worker-next-id (+ size 1))))))
+        (setf worker-next-id (+ size 1)))
+      t)))
 
 (defmethod stop-pool ((thread-pool thread-pool))
   (with-slots (jobs-queue workers-set workers-lock running-p)
